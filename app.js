@@ -390,23 +390,9 @@
     }
     try {
       showTopStatus("Choose a storage folder…", 0);
-      if (directoryHandle) {
-        const currentPermission = await directoryHandle.queryPermission({ mode: "readwrite" });
-        if (currentPermission === "granted") {
-          updateFolderStatus(`Autosaving to ${directoryHandle.name}`);
-          await writeProjectToFolder(true);
-          return;
-        }
-        if (currentPermission !== "granted") {
-          const renewed = await directoryHandle.requestPermission({ mode: "readwrite" });
-          if (renewed === "granted") {
-            updateFolderStatus(`Autosaving to ${directoryHandle.name}`);
-            await writeProjectToFolder(true);
-            return;
-          }
-        }
-      }
-      const selected = await window.showDirectoryPicker({ id: "mininote-projects", mode: "readwrite" });
+      const pickerOptions = { id: "mininote-projects", mode: "readwrite" };
+      if (directoryHandle) pickerOptions.startIn = directoryHandle;
+      const selected = await window.showDirectoryPicker(pickerOptions);
       directoryHandle = selected;
       await putSetting("project-directory", selected);
       updateFolderStatus(`Autosaving to ${selected.name}`);
