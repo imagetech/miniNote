@@ -51,6 +51,7 @@
   let gesture = null;
   let saveTimer = null;
   let folderSaveTimer = null;
+  let statusResetTimer = null;
   let directoryHandle = null;
   let dragDepth = 0;
 
@@ -320,6 +321,16 @@
     storageFolderStatus.textContent = message;
   }
 
+  function showTopStatus(message, resetAfter = 2200) {
+    clearTimeout(statusResetTimer);
+    saveStatus.textContent = message;
+    if (resetAfter) {
+      statusResetTimer = setTimeout(() => {
+        saveStatus.textContent = "Saved locally";
+      }, resetAfter);
+    }
+  }
+
   async function restoreStorageFolder() {
     if (!("showDirectoryPicker" in window)) {
       updateFolderStatus("Chrome or Edge required");
@@ -339,10 +350,12 @@
 
   async function chooseStorageFolder() {
     if (!("showDirectoryPicker" in window)) {
-      updateFolderStatus("Not supported in this browser");
+      updateFolderStatus("Chrome or Edge required");
+      showTopStatus("Folder access requires Chrome or Edge", 3500);
       return;
     }
     try {
+      showTopStatus("Choose a storage folder…", 0);
       if (directoryHandle) {
         const currentPermission = await directoryHandle.queryPermission({ mode: "readwrite" });
         if (currentPermission === "granted") {
@@ -365,9 +378,12 @@
       updateFolderStatus(`Autosaving to ${selected.name}`);
       await writeProjectToFolder(true);
     } catch (error) {
-      if (error.name !== "AbortError") {
+      if (error.name === "AbortError") {
+        showTopStatus("Folder selection cancelled");
+      } else {
         console.error("Folder selection failed", error);
         updateFolderStatus("Folder access failed");
+        showTopStatus("Couldn’t open the storage folder", 3500);
       }
     }
   }
@@ -400,6 +416,7 @@
     } catch (error) {
       console.error("Folder autosave failed", error);
       updateFolderStatus("Folder save failed");
+      showTopStatus("Couldn’t save to the storage folder", 3500);
     }
   }
 
@@ -904,9 +921,16 @@
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./service-worker.js").catch(error => {
-        console.error("Offline support could not start", error);
-      });
+      navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" })
+        .then(registration => registration.update())
+        .catch(error => {
+          console.error("Offline support could not start", error);
+        });
+    });
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (sessionStorage.getItem("mininote-sw-reloaded")) return;
+      sessionStorage.setItem("mininote-sw-reloaded", "true");
+      window.location.reload();
     });
   }
 })();

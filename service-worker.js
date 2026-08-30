@@ -1,4 +1,4 @@
-const CACHE_NAME = "mininote-shell-v2";
+const CACHE_NAME = "mininote-shell-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -32,7 +32,7 @@ self.addEventListener("fetch", event => {
   if (requestUrl.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-store" })
       .then(response => {
         if (response.ok) {
           const copy = response.clone();
