@@ -33,6 +33,12 @@ python -m http.server 4173
 
 Then open `http://localhost:4173`.
 
+## Installable app and GitHub Pages
+
+MiniNote includes a web app manifest and service worker. When served over HTTPS it can be installed as a Progressive Web App and continues to load offline. Project data remains local to each browser; use Projects → Save and Load to transfer it.
+
+The workflow in `.github/workflows/pages.yml` publishes the static application on every push to `main`. In the repository, select **Settings → Pages → Build and deployment → Source: GitHub Actions** once to enable it.
+
 ## Suggested next milestone
 
 Add AI-focused reference fields and richer content cards for each preset board.
