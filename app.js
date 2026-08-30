@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = "mininote-board-v1";
   const SETTINGS_KEY = "mininote-settings-v1";
-  const DEFAULT_SETTINGS = { imageCardWidth: 420 };
+  const DEFAULT_SETTINGS = { imageCardWidth: 560 };
   const viewport = document.querySelector("#viewport");
   const world = document.querySelector("#world");
   const notesLayer = document.querySelector("#notes");
@@ -67,7 +67,7 @@
   }
 
   function normalizeAppSettings(settings) {
-    const allowedImageWidths = [280, 420, 560];
+    const allowedImageWidths = [280, 560, 800];
     return {
       imageCardWidth: allowedImageWidths.includes(Number(settings?.imageCardWidth)) ? Number(settings.imageCardWidth) : DEFAULT_SETTINGS.imageCardWidth,
     };
