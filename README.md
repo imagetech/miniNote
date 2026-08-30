@@ -39,6 +39,10 @@ MiniNote includes a web app manifest and service worker. When served over HTTPS 
 
 The workflow in `.github/workflows/pages.yml` publishes the static application on every push to `main`. In the repository, select **Settings → Pages → Build and deployment → Source: GitHub Actions** once to enable it.
 
+## Local project folder
+
+In supported Chromium browsers, **Projects → Storage folder** selects a directory for automatic disk backups. MiniNote retains the directory handle in IndexedDB and writes a self-contained `<project>.mininote.json` file after changes. The browser may require permission to be renewed after a restart. Firefox and Safari do not currently expose the required directory-access API; manual Save and Load remain available there.
+
 ## Suggested next milestone
 
 Add AI-focused reference fields and richer content cards for each preset board.

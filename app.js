@@ -18,6 +18,7 @@
   const boardCreatorForm = document.querySelector("#board-creator-form");
   const newBoardTitle = document.querySelector("#new-board-title");
   const boardParentName = document.querySelector("#board-parent-name");
+  const storageFolderStatus = document.querySelector("#storage-folder-status");
   const imageUrls = new Map();
   let viewerUrl = null;
 
@@ -49,6 +50,8 @@
   let spacePressed = false;
   let gesture = null;
   let saveTimer = null;
+  let folderSaveTimer = null;
+  let directoryHandle = null;
   let dragDepth = 0;
 
   function loadState() {
@@ -80,6 +83,7 @@
     saveTimer = setTimeout(() => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       saveStatus.textContent = "Saved locally";
+      scheduleFolderSave();
     }, 180);
   }
 
@@ -209,8 +213,11 @@
 
   async function openImageStore() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open("mininote-media", 1);
-      request.onupgradeneeded = () => request.result.createObjectStore("images");
+      const request = indexedDB.open("mininote-media", 2);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains("images")) request.result.createObjectStore("images");
+        if (!request.result.objectStoreNames.contains("settings")) request.result.createObjectStore("settings");
+      };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -255,6 +262,25 @@
     });
   }
 
+  async function putSetting(key, value) {
+    const db = await openImageStore();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("settings", "readwrite");
+      tx.objectStore("settings").put(value, key);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+
+  async function getSetting(key) {
+    const db = await openImageStore();
+    return new Promise((resolve, reject) => {
+      const request = db.transaction("settings").objectStore("settings").get(key);
+      request.onsuccess = () => { db.close(); resolve(request.result); };
+      request.onerror = () => { db.close(); reject(request.error); };
+    });
+  }
+
   function blobToDataUrl(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -271,27 +297,121 @@
     return new Blob([bytes], { type: match[1] || "application/octet-stream" });
   }
 
+  function safeProjectName() {
+    return (state.title || "project").trim().replace(/[^a-z0-9_-]+/gi, "-").replace(/^-|-$/g, "") || "project";
+  }
+
+  async function buildProjectBundle() {
+    const images = await Promise.all(state.images.map(async image => {
+      const blob = await getImageBlob(image.id);
+      if (!blob) throw new Error(`Missing image: ${image.name || image.id}`);
+      return { id: image.id, name: image.name || "image", type: blob.type, data: await blobToDataUrl(blob) };
+    }));
+    return {
+      type: "mininote-project",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      state,
+      images,
+    };
+  }
+
+  function updateFolderStatus(message) {
+    storageFolderStatus.textContent = message;
+  }
+
+  async function restoreStorageFolder() {
+    if (!("showDirectoryPicker" in window)) {
+      updateFolderStatus("Chrome or Edge required");
+      return;
+    }
+    try {
+      directoryHandle = await getSetting("project-directory") || null;
+      if (!directoryHandle) return;
+      const permission = await directoryHandle.queryPermission({ mode: "readwrite" });
+      updateFolderStatus(permission === "granted" ? `Autosaving to ${directoryHandle.name}` : `Reconnect ${directoryHandle.name}`);
+    } catch (error) {
+      console.warn("Stored folder could not be restored", error);
+      directoryHandle = null;
+      updateFolderStatus("Choose an autosave folder");
+    }
+  }
+
+  async function chooseStorageFolder() {
+    if (!("showDirectoryPicker" in window)) {
+      updateFolderStatus("Not supported in this browser");
+      return;
+    }
+    try {
+      if (directoryHandle) {
+        const currentPermission = await directoryHandle.queryPermission({ mode: "readwrite" });
+        if (currentPermission === "granted") {
+          updateFolderStatus(`Autosaving to ${directoryHandle.name}`);
+          await writeProjectToFolder(true);
+          return;
+        }
+        if (currentPermission !== "granted") {
+          const renewed = await directoryHandle.requestPermission({ mode: "readwrite" });
+          if (renewed === "granted") {
+            updateFolderStatus(`Autosaving to ${directoryHandle.name}`);
+            await writeProjectToFolder(true);
+            return;
+          }
+        }
+      }
+      const selected = await window.showDirectoryPicker({ id: "mininote-projects", mode: "readwrite" });
+      directoryHandle = selected;
+      await putSetting("project-directory", selected);
+      updateFolderStatus(`Autosaving to ${selected.name}`);
+      await writeProjectToFolder(true);
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        console.error("Folder selection failed", error);
+        updateFolderStatus("Folder access failed");
+      }
+    }
+  }
+
+  function scheduleFolderSave() {
+    if (!directoryHandle) return;
+    clearTimeout(folderSaveTimer);
+    folderSaveTimer = setTimeout(() => writeProjectToFolder(false), 1200);
+  }
+
+  async function writeProjectToFolder(showStatus) {
+    if (!directoryHandle) return;
+    try {
+      const permission = await directoryHandle.queryPermission({ mode: "readwrite" });
+      if (permission !== "granted") {
+        updateFolderStatus(`Reconnect ${directoryHandle.name}`);
+        return;
+      }
+      updateFolderStatus(`Saving to ${directoryHandle.name}…`);
+      const bundle = await buildProjectBundle();
+      const fileHandle = await directoryHandle.getFileHandle(`${safeProjectName()}.mininote.json`, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(JSON.stringify(bundle, null, 2));
+      await writable.close();
+      updateFolderStatus(`Autosaving to ${directoryHandle.name}`);
+      if (showStatus) {
+        saveStatus.textContent = "Saved to folder";
+        setTimeout(() => { saveStatus.textContent = "Saved locally"; }, 1800);
+      }
+    } catch (error) {
+      console.error("Folder autosave failed", error);
+      updateFolderStatus("Folder save failed");
+    }
+  }
+
   async function saveProjectToDisk() {
     saveStatus.textContent = "Preparing project…";
     try {
-      const images = await Promise.all(state.images.map(async image => {
-        const blob = await getImageBlob(image.id);
-        if (!blob) throw new Error(`Missing image: ${image.name || image.id}`);
-        return { id: image.id, name: image.name || "image", type: blob.type, data: await blobToDataUrl(blob) };
-      }));
-      const bundle = {
-        type: "mininote-project",
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        state,
-        images,
-      };
+      const bundle = await buildProjectBundle();
       const file = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(file);
       const link = document.createElement("a");
-      const safeTitle = (state.title || "project").trim().replace(/[^a-z0-9_-]+/gi, "-").replace(/^-|-$/g, "") || "project";
       link.href = url;
-      link.download = `${safeTitle}.mininote.json`;
+      link.download = `${safeProjectName()}.mininote.json`;
       link.hidden = true;
       document.body.append(link);
       link.click();
@@ -325,6 +445,7 @@
       renderBoardChrome();
       applyView();
       renderNotes();
+      scheduleFolderSave();
       saveStatus.textContent = "Project loaded";
       setTimeout(() => { saveStatus.textContent = "Saved locally"; }, 1800);
     } catch (error) {
@@ -350,6 +471,7 @@
       renderBoardChrome();
       applyView();
       renderNotes();
+      scheduleFolderSave();
       saveStatus.textContent = "New project ready";
       setTimeout(() => { saveStatus.textContent = "Saved locally"; }, 1800);
     } catch (error) {
@@ -647,6 +769,10 @@
   document.querySelector("#save-project").addEventListener("click", () => { closeTopMenus(); saveProjectToDisk(); });
   document.querySelector("#new-project").addEventListener("click", () => { closeTopMenus(); startNewProject(); });
   document.querySelector("#load-project").addEventListener("click", () => { closeTopMenus(); projectInput.click(); });
+  document.querySelector("#storage-folder").addEventListener("click", () => {
+    closeTopMenus();
+    chooseStorageFolder();
+  });
   document.querySelector("#clear-board").addEventListener("click", () => {
     closeTopMenus();
     clearCurrentBoard();
@@ -774,6 +900,7 @@
   renderBoardChrome();
   applyView();
   renderNotes();
+  restoreStorageFolder();
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
