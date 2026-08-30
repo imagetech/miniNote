@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f2ea" />
+    <title>MiniNote</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="MiniNote home">
+          <span class="brand-mark">M</span>
+          <span>MiniNote</span>
+        </a>
+        <div class="board-title">
+          <input id="board-title" value="Project" aria-label="Board title" />
+          <nav id="breadcrumbs" class="breadcrumbs" aria-label="Board navigation"></nav>
+        </div>
+        <div class="topbar-actions">
+          <span id="save-status" class="save-status">Saved locally</span>
+          <details class="top-menu">
+            <summary class="button button-quiet">Projects <span class="menu-chevron">⌄</span></summary>
+            <div class="menu-panel" role="menu" aria-label="Project actions">
+              <button id="new-project" type="button" role="menuitem"><span class="menu-icon">＋</span><span><strong>New</strong><small>Start a fresh project</small></span></button>
+              <button id="load-project" type="button" role="menuitem"><span class="menu-icon">↥</span><span><strong>Load</strong><small>Open a project file</small></span></button>
+              <button id="save-project" type="button" role="menuitem"><span class="menu-icon">↓</span><span><strong>Save</strong><small>Download to disk</small></span></button>
+              <div class="menu-separator"></div>
+              <button id="clear-board" class="menu-danger" type="button" role="menuitem"><span class="menu-icon">×</span><span><strong>Clear</strong><small>Clear this board</small></span></button>
+            </div>
+          </details>
+          <details class="top-menu" id="boards-menu">
+            <summary class="button button-quiet">Boards <span class="menu-chevron">⌄</span></summary>
+            <div class="menu-panel" role="menu" aria-label="Project boards">
+              <button type="button" role="menuitem" data-board-link="characters"><span class="menu-icon board-menu-characters">♟</span><span><strong>Characters</strong><small>People and identities</small></span><span class="active-board-mark">✓</span></button>
+              <button type="button" role="menuitem" data-board-link="settings"><span class="menu-icon board-menu-settings">⌂</span><span><strong>Settings</strong><small>Locations and environments</small></span><span class="active-board-mark">✓</span></button>
+              <button type="button" role="menuitem" data-board-link="shots"><span class="menu-icon board-menu-shots">▣</span><span><strong>Shots</strong><small>Visual compositions</small></span><span class="active-board-mark">✓</span></button>
+              <button type="button" role="menuitem" data-board-link="storyboard"><span class="menu-icon board-menu-storyboard">▤</span><span><strong>Storyboard</strong><small>Sequence and continuity</small></span><span class="active-board-mark">✓</span></button>
+            </div>
+          </details>
+          <details class="top-menu">
+            <summary class="button button-primary">Add <span class="menu-chevron">⌄</span></summary>
+            <div class="menu-panel menu-panel-right" role="menu" aria-label="Add content">
+              <button id="add-note" type="button" role="menuitem"><span class="menu-icon note-menu-icon">T</span><span><strong>Note</strong><small>Add a text reference</small></span></button>
+              <button id="add-image" type="button" role="menuitem"><span class="menu-icon">▧</span><span><strong>Image</strong><small>Upload image references</small></span></button>
+              <button id="add-board" type="button" role="menuitem"><span class="menu-icon">◇</span><span><strong>Board</strong><small>Nest a board here</small></span></button>
+            </div>
+          </details>
+          <input id="image-input" type="file" accept="image/*" multiple hidden />
+          <input id="project-input" type="file" accept=".json,.mininote.json,application/json" hidden />
+        </div>
+      </header>
+
+      <main id="viewport" class="viewport" tabindex="0" aria-label="Freeform board canvas">
+        <div id="world" class="world">
+          <div id="grid" class="grid"></div>
+          <div id="notes" class="notes-layer"></div>
+        </div>
+        <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
+          <div><strong>Drop images here</strong><span>They’ll be placed on this board</span></div>
+        </div>
+        <div class="canvas-hint">
+          <kbd>Space</kbd> + drag to pan <span>•</span> Scroll to zoom <span>•</span> Double-click to add
+        </div>
+        <div class="zoom-controls" aria-label="Zoom controls">
+          <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+          <button id="zoom-label" type="button" aria-label="Reset zoom">100%</button>
+          <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+        </div>
+      </main>
+    </div>
+    <dialog id="image-viewer" class="image-viewer" aria-label="Full resolution image viewer">
+      <div class="viewer-toolbar">
+        <div>
+          <strong id="viewer-title">Image</strong>
+          <span id="viewer-size"></span>
+        </div>
+        <button id="close-viewer" type="button" aria-label="Close image viewer">×</button>
+      </div>
+      <div class="viewer-stage">
+        <img id="viewer-image" alt="Full resolution preview" />
+      </div>
+    </dialog>
+    <dialog id="board-creator" class="board-creator" aria-labelledby="board-creator-title">
+      <form id="board-creator-form" method="dialog">
+        <div class="creator-icon">◇</div>
+        <div class="creator-copy">
+          <h2 id="board-creator-title">Create a sub-board</h2>
+          <p>It will be nested inside <strong id="board-parent-name">this board</strong>.</p>
+        </div>
+        <label for="new-board-title">Board name</label>
+        <input id="new-board-title" name="title" maxlength="80" autocomplete="off" placeholder="e.g. Main Cast" required />
+        <div class="creator-actions">
+          <button id="cancel-board" class="button button-quiet" type="button">Cancel</button>
+          <button class="button button-primary" type="submit">Create board</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="./app.js"></script>
+  </body>
+</html>
