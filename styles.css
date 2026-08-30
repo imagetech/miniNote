@@ -47,6 +47,7 @@ button { color: inherit; }
 .menu-panel { position: absolute; z-index: 50; top: calc(100% + 9px); right: 0; width: 245px; padding: 7px; border: 1px solid #dedad1; border-radius: 12px; background: #fff; box-shadow: 0 16px 40px rgba(43, 39, 31, .16), 0 3px 8px rgba(43, 39, 31, .07); }
 .menu-panel button { width: 100%; display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
 .menu-panel button[data-board-link] { grid-template-columns: 34px 1fr 18px; }
+.menu-panel button[data-image-size] { grid-template-columns: 34px 1fr 18px; }
 .menu-panel button:hover, .menu-panel button:focus-visible { background: #f4f2ed; outline: 0; }
 .menu-panel button > span:nth-child(2) { display: grid; gap: 1px; }
 .menu-panel strong { font-size: 13px; }
@@ -58,8 +59,11 @@ button { color: inherit; }
 .board-menu-shots { color: #fff; background: #486f8f; }
 .board-menu-storyboard { color: #fff; background: #795c85; }
 .active-board-mark { visibility: hidden; color: #347d68; font-weight: 800; }
+.active-setting-mark { visibility: hidden; color: #347d68; font-weight: 800; }
 .menu-panel button[data-active="true"] { background: #f0f6f3; }
 .menu-panel button[data-active="true"] .active-board-mark { visibility: visible; }
+.menu-panel button[data-active="true"] .active-setting-mark { visibility: visible; }
+.menu-section-label { padding: 7px 10px 4px; color: #969188; font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .menu-separator { height: 1px; margin: 5px 7px; background: #ebe8e1; }
 .menu-panel .menu-danger:hover { background: #fbefed; }
 .menu-panel .menu-danger .menu-icon { color: #984d49; background: #fae8e5; }

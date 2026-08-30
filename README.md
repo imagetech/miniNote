@@ -21,6 +21,8 @@ The first increment of a visual notes application inspired by freeform creative 
 - Compact Projects and Add menus, including current-board clearing
 - Boards menu for direct navigation between preset reference boards
 - Arbitrarily nested boards created from Add → Board
+- Configurable image-card previews (Small, Medium, or Large) from the Settings menu
+- Global app settings embedded in saved and autosaved project JSON files
 - Editable board title and responsive layout
 
 ## Run locally

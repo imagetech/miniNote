@@ -1,5 +1,7 @@
 (() => {
   const STORAGE_KEY = "mininote-board-v1";
+  const SETTINGS_KEY = "mininote-settings-v1";
+  const DEFAULT_SETTINGS = { imageCardWidth: 420 };
   const viewport = document.querySelector("#viewport");
   const world = document.querySelector("#world");
   const notesLayer = document.querySelector("#notes");
@@ -46,6 +48,7 @@
   const starterState = createFreshProjectState();
 
   let state = loadState();
+  let appSettings = loadAppSettings();
   let selectedId = null;
   let spacePressed = false;
   let gesture = null;
@@ -61,6 +64,36 @@
       if (saved && Array.isArray(saved.notes) && saved.view) return normalizeState(saved);
     } catch (_) {}
     return starterState;
+  }
+
+  function normalizeAppSettings(settings) {
+    const allowedImageWidths = [280, 420, 560];
+    return {
+      imageCardWidth: allowedImageWidths.includes(Number(settings?.imageCardWidth)) ? Number(settings.imageCardWidth) : DEFAULT_SETTINGS.imageCardWidth,
+    };
+  }
+
+  function loadAppSettings() {
+    try {
+      return normalizeAppSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY)));
+    } catch (_) {
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+
+  function saveAppSettings() {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+    updateSettingsMenu();
+    renderNotes();
+    scheduleFolderSave();
+  }
+
+  function updateSettingsMenu() {
+    document.querySelectorAll("[data-image-size]").forEach(button => {
+      const active = Number(button.dataset.imageSize) === appSettings.imageCardWidth;
+      button.dataset.active = String(active);
+      button.setAttribute("aria-checked", String(active));
+    });
   }
 
   function normalizeState(saved) {
@@ -312,6 +345,7 @@
       type: "mininote-project",
       version: 1,
       exportedAt: new Date().toISOString(),
+      settings: appSettings,
       state,
       images,
     };
@@ -457,9 +491,12 @@
       await clearImageStore();
       for (const image of restoredImages) await putImageBlob(image.id, image.blob);
       state = normalizeState(bundle.state);
+      appSettings = normalizeAppSettings(bundle.settings || appSettings);
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       selectedId = null;
       renderBoardChrome();
+      updateSettingsMenu();
       applyView();
       renderNotes();
       scheduleFolderSave();
@@ -532,7 +569,7 @@
     const card = document.createElement("article");
     card.className = `image-card${image.id === selectedId ? " selected" : ""}`;
     card.dataset.id = image.id;
-    card.style.width = `${image.width || 300}px`;
+    card.style.width = `${appSettings.imageCardWidth}px`;
     card.style.transform = `translate(${image.x}px, ${image.y}px)`;
     card.innerHTML = `
       <div class="note-handle" aria-label="Drag image">
@@ -647,7 +684,7 @@
     if (!file?.type?.startsWith("image/")) return;
     const id = crypto.randomUUID();
     const point = screenToWorld(clientX + index * 26, clientY + index * 26);
-    const image = { id, boardId: state.currentBoardId, x: Math.round(point.x - 150), y: Math.round(point.y - 30), width: 300, name: file.name || "Pasted image", caption: "" };
+    const image = { id, boardId: state.currentBoardId, x: Math.round(point.x - appSettings.imageCardWidth / 2), y: Math.round(point.y - 30), name: file.name || "Pasted image", caption: "" };
     try {
       await putImageBlob(id, file);
       state.images.push(image);
@@ -790,6 +827,14 @@
     closeTopMenus();
     chooseStorageFolder();
   });
+  document.querySelectorAll("[data-image-size]").forEach(button => {
+    button.addEventListener("click", () => {
+      appSettings.imageCardWidth = Number(button.dataset.imageSize);
+      saveAppSettings();
+      closeTopMenus();
+      showTopStatus(`Image size set to ${button.querySelector("strong").textContent}`);
+    });
+  });
   document.querySelector("#clear-board").addEventListener("click", () => {
     closeTopMenus();
     clearCurrentBoard();
@@ -915,6 +960,7 @@
   });
 
   renderBoardChrome();
+  updateSettingsMenu();
   applyView();
   renderNotes();
   restoreStorageFolder();
