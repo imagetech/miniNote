@@ -530,13 +530,15 @@
     const entries = [];
     for await (const [name, entryHandle] of handle.entries()) entries.push({ name, handle: entryHandle });
     entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-    const node = { name: handle.name, relativePath, files: [], children: [] };
+    const node = { name: handle.name, relativePath, files: [], jsonFiles: [], children: [] };
     for (const entry of entries) {
       if (entry.handle.kind === "directory") {
         const childPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
         node.children.push(await scanImageDirectory(entry.handle, childPath));
       } else if (entry.handle.kind === "file" && isSupportedImageFile(entry.name)) {
         node.files.push({ name: entry.name, handle: entry.handle });
+      } else if (entry.handle.kind === "file" && /\.json$/i.test(entry.name)) {
+        node.jsonFiles.push({ name: entry.name, handle: entry.handle });
       }
     }
     return node;
@@ -545,8 +547,12 @@
   function directoryCounts(node) {
     return node.children.reduce((totals, child) => {
       const childTotals = directoryCounts(child);
-      return { directories: totals.directories + childTotals.directories + 1, images: totals.images + childTotals.images };
-    }, { directories: 0, images: node.files.length });
+      return {
+        directories: totals.directories + childTotals.directories + 1,
+        images: totals.images + childTotals.images,
+        jsonFiles: totals.jsonFiles + childTotals.jsonFiles,
+      };
+    }, { directories: 0, images: node.files.length, jsonFiles: node.jsonFiles.length });
   }
 
   async function populateDirectoryBoard(node, boardId, nextState, progress) {
@@ -584,6 +590,30 @@
       saveStatus.textContent = `Importing image ${progress.imported} of ${progress.total}…`;
     }
 
+    const noteColumns = 3;
+    const noteStartY = imageStartY + Math.ceil(node.files.length / imageColumns) * 520;
+    for (let index = 0; index < node.jsonFiles.length; index += 1) {
+      const entry = node.jsonFiles[index];
+      const file = await entry.handle.getFile();
+      const rawText = await file.text();
+      let formattedText = rawText;
+      try {
+        formattedText = JSON.stringify(JSON.parse(rawText), null, 2);
+      } catch (_) {}
+      nextState.notes.push({
+        id: crypto.randomUUID(),
+        boardId,
+        x: 70 + (index % noteColumns) * 280,
+        y: noteStartY + Math.floor(index / noteColumns) * 220,
+        color: "paper",
+        text: `${entry.name}\n\n${formattedText}`,
+        sourceType: "json",
+        sourcePath: node.relativePath ? `${node.relativePath}/${entry.name}` : entry.name,
+      });
+      progress.jsonImported += 1;
+      saveStatus.textContent = `Importing JSON ${progress.jsonImported} of ${progress.jsonTotal}…`;
+    }
+
     for (const child of node.children) await populateDirectoryBoard(child, child.boardId, nextState, progress);
   }
 
@@ -598,7 +628,7 @@
       saveStatus.textContent = "Scanning folders…";
       const tree = await scanImageDirectory(rootHandle);
       const counts = directoryCounts(tree);
-      const approved = confirm(`Build “${rootHandle.name}” from this folder?\n\n${counts.directories} subfolder${counts.directories === 1 ? "" : "s"} and ${counts.images} image${counts.images === 1 ? "" : "s"} found. This will replace the project currently open in GN Studio.`);
+      const approved = confirm(`Build “${rootHandle.name}” from this folder?\n\n${counts.directories} subfolder${counts.directories === 1 ? "" : "s"}, ${counts.images} image${counts.images === 1 ? "" : "s"}, and ${counts.jsonFiles} JSON file${counts.jsonFiles === 1 ? "" : "s"} found. This will replace the project currently open in GN Studio.`);
       if (!approved) {
         showTopStatus("Folder import cancelled");
         return;
@@ -618,7 +648,7 @@
         images: [],
       };
       state = nextState;
-      await populateDirectoryBoard(tree, "project", nextState, { imported: 0, total: counts.images });
+      await populateDirectoryBoard(tree, "project", nextState, { imported: 0, total: counts.images, jsonImported: 0, jsonTotal: counts.jsonFiles });
       await putSetting("source-directory", rootHandle);
       selectedId = null;
       gesture = null;
@@ -627,7 +657,7 @@
       applyView();
       renderNotes();
       scheduleFolderSave();
-      showTopStatus(`Built ${counts.directories} board${counts.directories === 1 ? "" : "s"} with ${counts.images} image${counts.images === 1 ? "" : "s"}`, 3500);
+      showTopStatus(`Built ${counts.directories} board${counts.directories === 1 ? "" : "s"} with ${counts.images} image${counts.images === 1 ? "" : "s"} and ${counts.jsonFiles} JSON note${counts.jsonFiles === 1 ? "" : "s"}`, 4000);
     } catch (error) {
       if (error.name === "AbortError") {
         showTopStatus("Folder selection cancelled");
