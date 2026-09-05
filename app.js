@@ -466,7 +466,7 @@
     try {
       const bundle = JSON.parse(await file.text());
       if (bundle?.type !== "mininote-project" || bundle.version !== 1 || !bundle.state || !Array.isArray(bundle.state.notes) || !Array.isArray(bundle.images)) {
-        throw new Error("This is not a supported MiniNote project file");
+        throw new Error("This is not a supported GN Studio project file");
       }
       const restoredImages = bundle.images.map(image => {
         if (!image.id || typeof image.data !== "string") throw new Error("The project contains invalid image data");

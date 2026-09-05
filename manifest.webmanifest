@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "MiniNote",
-  "short_name": "MiniNote",
-  "description": "A freeform visual reference board for AI projects.",
+  "name": "GN Studio",
+  "short_name": "GN Studio",
+  "description": "A visual workspace for developing graphic-narrative projects.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

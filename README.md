@@ -1,6 +1,8 @@
-# MiniNote
+# GN Studio
 
-The first increment of a visual notes application inspired by freeform creative boards.
+A graphic-narrative development application based on MiniNote v1.0.0 and its freeform creative-board foundation.
+
+Development for GN Studio takes place on the `gn-studio` branch. MiniNote remains preserved independently on `main`, with its version 1.0 baseline tagged as `v1.0.0`.
 
 ## Included in milestone 1
 
@@ -37,13 +39,13 @@ Then open `http://localhost:4173`.
 
 ## Installable app and GitHub Pages
 
-MiniNote includes a web app manifest and service worker. When served over HTTPS it can be installed as a Progressive Web App and continues to load offline. Project data remains local to each browser; use Projects → Save and Load to transfer it.
+GN Studio includes a web app manifest and service worker. When served over HTTPS it can be installed as a Progressive Web App and continues to load offline. Project data remains local to each browser; use Projects → Save and Load to transfer it.
 
 The workflow in `.github/workflows/pages.yml` publishes the static application on every push to `main`. In the repository, select **Settings → Pages → Build and deployment → Source: GitHub Actions** once to enable it.
 
 ## Local project folder
 
-In supported Chromium browsers, **Projects → Storage folder** selects a directory for automatic disk backups. MiniNote retains the directory handle in IndexedDB and writes a self-contained `<project>.mininote.json` file after changes. The browser may require permission to be renewed after a restart. Firefox and Safari do not currently expose the required directory-access API; manual Save and Load remain available there.
+In supported Chromium browsers, **Projects → Set Storage Folder** selects a directory for automatic disk backups. GN Studio retains the directory handle in IndexedDB and writes a self-contained `<project>.mininote.json` file after changes. The browser may require permission to be renewed after a restart. Firefox and Safari do not currently expose the required directory-access API; manual Save and Load remain available there.
 
 ## Suggested next milestone
 

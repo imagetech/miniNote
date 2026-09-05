@@ -1,4 +1,4 @@
-const CACHE_NAME = "mininote-shell-v3";
+const CACHE_NAME = "gn-studio-shell-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -20,7 +20,7 @@ self.addEventListener("install", event => {
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(names => Promise.all(
-      names.filter(name => name.startsWith("mininote-shell-") && name !== CACHE_NAME).map(name => caches.delete(name))
+      names.filter(name => /^(mininote|gn-studio)-shell-/.test(name) && name !== CACHE_NAME).map(name => caches.delete(name))
     ))
   );
   self.clients.claim();
