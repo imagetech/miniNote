@@ -5,6 +5,7 @@
   const viewport = document.querySelector("#viewport");
   const world = document.querySelector("#world");
   const notesLayer = document.querySelector("#notes");
+  const boardRail = document.querySelector("#board-rail");
   const titleInput = document.querySelector("#board-title");
   const breadcrumbs = document.querySelector("#breadcrumbs");
   const saveStatus = document.querySelector("#save-status");
@@ -146,6 +147,7 @@
     for (const url of imageUrls.values()) URL.revokeObjectURL(url);
     imageUrls.clear();
     notesLayer.replaceChildren();
+    boardRail.replaceChildren();
     for (const board of state.boards.filter(board => board.parentBoardId === state.currentBoardId)) renderBoardCard(board);
     for (const note of state.notes.filter(note => note.boardId === state.currentBoardId)) {
       const card = document.createElement("article");
@@ -191,12 +193,11 @@
     const card = document.createElement("article");
     const itemCount = state.notes.filter(note => note.boardId === board.id).length + state.images.filter(image => image.boardId === board.id).length;
     const childCount = state.boards.filter(child => child.parentBoardId === board.id).length;
-    card.className = `board-card${board.id === selectedId ? " selected" : ""}`;
+    card.className = "board-card";
     card.dataset.id = board.id;
     card.dataset.board = board.id;
-    card.style.transform = `translate(${board.x}px, ${board.y}px)`;
     card.innerHTML = `
-      <div class="note-handle" aria-label="Drag board">
+      <div class="note-handle" aria-hidden="true">
         <span class="drag-dots">···</span>
       </div>
       <button class="board-card-body" type="button" aria-label="Open ${escapeHtml(board.title)} board">
@@ -209,8 +210,7 @@
       </button>`;
     const body = card.querySelector(".board-card-body");
     body.addEventListener("click", event => { event.stopPropagation(); openBoard(board.id); });
-    card.querySelector(".note-handle").addEventListener("pointerdown", event => startCardDrag(event, board, "boards"));
-    notesLayer.append(card);
+    boardRail.append(card);
   }
 
   function currentBoardTitle() {
@@ -916,6 +916,7 @@
   }
 
   viewport.addEventListener("pointerdown", startPan);
+  boardRail.addEventListener("wheel", event => event.stopPropagation(), { passive: true });
   viewport.addEventListener("pointermove", event => {
     if (!gesture) return;
     if (gesture.type === "pan") {

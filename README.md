@@ -24,6 +24,7 @@ Development for GN Studio takes place on the `gn-studio` branch. MiniNote remain
 - Compact Projects and Add menus, including current-board clearing
 - Boards menu for direct navigation between preset reference boards
 - Arbitrarily nested boards created from Add → Board
+- Fixed left-side sub-board rail that remains in place while the canvas pans
 - Configurable image-card previews (Small, Medium, or Large) from the Settings menu
 - Global app settings embedded in saved and autosaved project JSON files
 - Build a project from a local directory, recursively mirroring folders and importing images and JSON notes
