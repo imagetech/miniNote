@@ -6,6 +6,7 @@
   const world = document.querySelector("#world");
   const notesLayer = document.querySelector("#notes");
   const boardRail = document.querySelector("#board-rail");
+  const selectionBox = document.querySelector("#selection-box");
   const titleInput = document.querySelector("#board-title");
   const breadcrumbs = document.querySelector("#breadcrumbs");
   const saveStatus = document.querySelector("#save-status");
@@ -54,6 +55,7 @@
   let state = loadState();
   let appSettings = loadAppSettings();
   let selectedId = null;
+  let selectedIds = new Set();
   let spacePressed = false;
   let gesture = null;
   let saveTimer = null;
@@ -154,7 +156,7 @@
       const card = document.createElement("article");
       const isJsonNote = note.sourceType === "json";
       const fileName = note.fileName || note.sourcePath?.split(/[\\/]/).pop() || "JSON file";
-      card.className = `note${isJsonNote ? " json-note" : ""}${note.id === selectedId ? " selected" : ""}`;
+      card.className = `note${isJsonNote ? " json-note" : ""}${selectedIds.has(note.id) ? " selected" : ""}`;
       card.dataset.id = note.id;
       card.dataset.color = note.color || "paper";
       card.style.transform = `translate(${note.x}px, ${note.y}px)`;
@@ -291,6 +293,7 @@
     state.currentBoardId = boardId;
     state.view = state.boardViews[boardId] ? { ...state.boardViews[boardId] } : { x: 180, y: 110, zoom: 1 };
     selectedId = null;
+    selectedIds.clear();
     renderBoardChrome();
     applyView();
     renderNotes();
@@ -533,6 +536,7 @@
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       selectedId = null;
+      selectedIds.clear();
       renderBoardChrome();
       updateSettingsMenu();
       applyView();
@@ -558,6 +562,7 @@
       if (viewerUrl) closeImageViewer();
       state = createFreshProjectState();
       selectedId = null;
+      selectedIds.clear();
       gesture = null;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       renderBoardChrome();
@@ -702,6 +707,7 @@
       await populateDirectoryBoard(tree, "project", nextState, { imported: 0, total: counts.images, jsonImported: 0, jsonTotal: counts.jsonFiles });
       await putSetting("source-directory", rootHandle);
       selectedId = null;
+      selectedIds.clear();
       gesture = null;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       renderBoardChrome();
@@ -736,6 +742,7 @@
       state.notes = state.notes.filter(note => note.boardId !== state.currentBoardId);
       state.images = state.images.filter(image => image.boardId !== state.currentBoardId);
       selectedId = null;
+      selectedIds.clear();
       renderNotes();
       scheduleSave();
       saveStatus.textContent = "Board cleared";
@@ -752,7 +759,7 @@
 
   function renderImageCard(image) {
     const card = document.createElement("article");
-    card.className = `image-card${image.id === selectedId ? " selected" : ""}`;
+    card.className = `image-card${selectedIds.has(image.id) ? " selected" : ""}`;
     card.dataset.id = image.id;
     card.style.width = `${appSettings.imageCardWidth}px`;
     card.style.transform = `translate(${image.x}px, ${image.y}px)`;
@@ -794,9 +801,14 @@
     }).catch(() => { card.querySelector(".image-loading").textContent = "Image unavailable"; });
   }
 
+  function setSelection(ids) {
+    selectedIds = new Set(ids);
+    selectedId = selectedIds.size === 1 ? selectedIds.values().next().value : null;
+    document.querySelectorAll(".note, .image-card").forEach(card => card.classList.toggle("selected", selectedIds.has(card.dataset.id)));
+  }
+
   function selectNote(id) {
-    selectedId = id;
-    document.querySelectorAll(".note, .image-card, .board-card").forEach(card => card.classList.toggle("selected", card.dataset.id === id));
+    setSelection(id ? [id] : []);
   }
 
   function addNoteAt(clientX, clientY, focus = true) {
@@ -804,7 +816,7 @@
     const colors = ["paper", "yellow", "rose", "blue"];
     const note = { id: crypto.randomUUID(), boardId: state.currentBoardId, x: point.x - 120, y: point.y - 30, color: colors[state.notes.length % colors.length], text: "" };
     state.notes.push(note);
-    selectedId = note.id;
+    setSelection([note.id]);
     renderNotes();
     scheduleSave();
     if (focus) notesLayer.querySelector(`[data-id="${note.id}"] textarea`).focus();
@@ -829,21 +841,21 @@
       parentBoardId: state.currentBoardId,
     };
     state.boards.push(board);
-    selectedId = board.id;
+    setSelection([]);
     renderNotes();
     scheduleSave();
   }
 
   function deleteNote(id) {
     state.notes = state.notes.filter(note => note.id !== id);
-    if (selectedId === id) selectedId = null;
+    setSelection([]);
     renderNotes();
     scheduleSave();
   }
 
   async function deleteImage(id) {
     state.images = state.images.filter(image => image.id !== id);
-    if (selectedId === id) selectedId = null;
+    setSelection([]);
     const url = imageUrls.get(id);
     if (url) URL.revokeObjectURL(url);
     imageUrls.delete(id);
@@ -897,7 +909,7 @@
     try {
       await putImageBlob(id, file);
       state.images.push(image);
-      selectedId = id;
+      setSelection([id]);
       renderNotes();
       scheduleSave();
     } catch (error) {
@@ -926,22 +938,65 @@
     if (event.button !== 0 || event.target.closest("button")) return;
     event.preventDefault();
     event.stopPropagation();
-    selectNote(item.id);
-    gesture = { type: "card", collection, id: item.id, startX: event.clientX, startY: event.clientY, noteX: item.x, noteY: item.y, dropBoardId: null };
+    if (selectedIds.has(item.id) && selectedIds.size > 1) {
+      const items = [
+        ...state.notes.map(entry => ({ item: entry, collection: "notes" })),
+        ...state.images.map(entry => ({ item: entry, collection: "images" })),
+      ].filter(entry => entry.item.boardId === state.currentBoardId && selectedIds.has(entry.item.id))
+        .map(entry => ({ ...entry, x: entry.item.x, y: entry.item.y }));
+      gesture = { type: "group", items, startX: event.clientX, startY: event.clientY, dropBoardId: null };
+    } else {
+      selectNote(item.id);
+      gesture = { type: "card", collection, id: item.id, startX: event.clientX, startY: event.clientY, noteX: item.x, noteY: item.y, dropBoardId: null };
+    }
     viewport.setPointerCapture(event.pointerId);
+  }
+
+  function updateMarquee(event) {
+    const viewportRect = viewport.getBoundingClientRect();
+    const left = Math.min(gesture.startX, event.clientX);
+    const top = Math.min(gesture.startY, event.clientY);
+    const right = Math.max(gesture.startX, event.clientX);
+    const bottom = Math.max(gesture.startY, event.clientY);
+    if (Math.abs(event.clientX - gesture.startX) > 4 || Math.abs(event.clientY - gesture.startY) > 4) gesture.moved = true;
+    selectionBox.style.left = `${left - viewportRect.left}px`;
+    selectionBox.style.top = `${top - viewportRect.top}px`;
+    selectionBox.style.width = `${right - left}px`;
+    selectionBox.style.height = `${bottom - top}px`;
+    selectionBox.classList.toggle("visible", gesture.moved);
+    if (!gesture.moved) return;
+    const ids = [];
+    notesLayer.querySelectorAll(".note, .image-card").forEach(card => {
+      const rect = card.getBoundingClientRect();
+      const intersects = rect.right >= left && rect.left <= right && rect.bottom >= top && rect.top <= bottom;
+      if (intersects) ids.push(card.dataset.id);
+    });
+    setSelection(ids);
+  }
+
+  function updateDropTarget(event) {
+    gesture.dropBoardId = null;
+    document.querySelectorAll(".board-card").forEach(card => {
+      const rect = card.getBoundingClientRect();
+      const isTarget = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+      card.classList.toggle("drop-target", isTarget);
+      if (isTarget) gesture.dropBoardId = card.dataset.id;
+    });
   }
 
   function startPan(event) {
     if (event.button === 1 || (event.button === 0 && spacePressed)) {
       event.preventDefault();
-      selectedId = null;
       selectNote(null);
       gesture = { type: "pan", startX: event.clientX, startY: event.clientY, viewX: state.view.x, viewY: state.view.y };
       viewport.classList.add("is-panning");
       viewport.setPointerCapture(event.pointerId);
-    } else if (event.button === 0 && !event.target.closest(".note, .image-card, .board-card")) {
-      selectedId = null;
+    } else if (event.button === 0 && !event.target.closest(".note, .image-card, .board-card, .board-rail, button, input")) {
+      event.preventDefault();
       selectNote(null);
+      gesture = { type: "marquee", startX: event.clientX, startY: event.clientY, moved: false };
+      viewport.classList.add("is-selecting");
+      viewport.setPointerCapture(event.pointerId);
     }
   }
 
@@ -953,20 +1008,26 @@
       state.view.x = gesture.viewX + event.clientX - gesture.startX;
       state.view.y = gesture.viewY + event.clientY - gesture.startY;
       applyView();
-    } else {
+    } else if (gesture.type === "marquee") {
+      updateMarquee(event);
+    } else if (gesture.type === "group") {
+      const deltaX = (event.clientX - gesture.startX) / state.view.zoom;
+      const deltaY = (event.clientY - gesture.startY) / state.view.zoom;
+      gesture.items.forEach(entry => {
+        entry.item.x = Math.round(entry.x + deltaX);
+        entry.item.y = Math.round(entry.y + deltaY);
+        const card = notesLayer.querySelector(`[data-id="${entry.item.id}"]`);
+        if (card) card.style.transform = `translate(${entry.item.x}px, ${entry.item.y}px)`;
+      });
+      updateDropTarget(event);
+    } else if (gesture.type === "card") {
       const note = state[gesture.collection].find(item => item.id === gesture.id);
       if (!note) return;
       note.x = Math.round(gesture.noteX + (event.clientX - gesture.startX) / state.view.zoom);
       note.y = Math.round(gesture.noteY + (event.clientY - gesture.startY) / state.view.zoom);
       notesLayer.querySelector(`[data-id="${note.id}"]`).style.transform = `translate(${note.x}px, ${note.y}px)`;
       if (gesture.collection === "notes" || gesture.collection === "images") {
-        gesture.dropBoardId = null;
-        document.querySelectorAll(".board-card").forEach(card => {
-          const rect = card.getBoundingClientRect();
-          const isTarget = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
-          card.classList.toggle("drop-target", isTarget);
-          if (isTarget) gesture.dropBoardId = card.dataset.id;
-        });
+        updateDropTarget(event);
       }
     }
   });
@@ -978,20 +1039,34 @@
           item.boardId = gesture.dropBoardId;
           item.x = 80;
           item.y = 80;
-          selectedId = null;
+          setSelection([]);
         }
         renderNotes();
+      } else if (gesture.type === "group" && gesture.dropBoardId) {
+        const minX = Math.min(...gesture.items.map(entry => entry.item.x));
+        const minY = Math.min(...gesture.items.map(entry => entry.item.y));
+        gesture.items.forEach(entry => {
+          entry.item.boardId = gesture.dropBoardId;
+          entry.item.x = 80 + entry.item.x - minX;
+          entry.item.y = 80 + entry.item.y - minY;
+        });
+        setSelection([]);
+        renderNotes();
       }
-      scheduleSave();
+      if (gesture.type !== "marquee") scheduleSave();
     }
     document.querySelectorAll(".board-card.drop-target").forEach(card => card.classList.remove("drop-target"));
+    selectionBox.classList.remove("visible");
     gesture = null;
     viewport.classList.remove("is-panning");
+    viewport.classList.remove("is-selecting");
   });
   viewport.addEventListener("pointercancel", () => {
     document.querySelectorAll(".board-card.drop-target").forEach(card => card.classList.remove("drop-target"));
+    selectionBox.classList.remove("visible");
     gesture = null;
     viewport.classList.remove("is-panning");
+    viewport.classList.remove("is-selecting");
   });
   viewport.addEventListener("dblclick", event => {
     if (!event.target.closest(".note, .image-card, .board-card, button, input")) addNoteAt(event.clientX, event.clientY);

@@ -8,6 +8,7 @@ Development for GN Studio takes place on the `gn-studio` branch. MiniNote remain
 
 - Infinite-feeling dotted canvas
 - Pan with `Space` + drag or the middle mouse button
+- Drag on empty canvas space to marquee-select notes and images, then drag a selected handle to move the group
 - Zoom with the mouse wheel or on-screen controls
 - Create text notes with the toolbar or by double-clicking the canvas
 - Drag, edit, select, and delete notes
