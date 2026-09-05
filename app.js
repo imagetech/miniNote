@@ -101,8 +101,10 @@
     saved.currentBoardId ||= "project";
     saved.boardViews ||= {};
     saved.boards ||= [];
-    for (const preset of presetBoards) {
-      if (!saved.boards.some(board => board.id === preset.id)) saved.boards.push({ ...preset });
+    if (!saved.directoryProject) {
+      for (const preset of presetBoards) {
+        if (!saved.boards.some(board => board.id === preset.id)) saved.boards.push({ ...preset });
+      }
     }
     saved.notes.forEach(note => { note.boardId ||= "project"; });
     saved.images.forEach(image => { image.boardId ||= "project"; });
@@ -520,6 +522,122 @@
     }
   }
 
+  function isSupportedImageFile(name) {
+    return /\.(jpe?g|png|gif|tiff?|webp)$/i.test(name);
+  }
+
+  async function scanImageDirectory(handle, relativePath = "") {
+    const entries = [];
+    for await (const [name, entryHandle] of handle.entries()) entries.push({ name, handle: entryHandle });
+    entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    const node = { name: handle.name, relativePath, files: [], children: [] };
+    for (const entry of entries) {
+      if (entry.handle.kind === "directory") {
+        const childPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+        node.children.push(await scanImageDirectory(entry.handle, childPath));
+      } else if (entry.handle.kind === "file" && isSupportedImageFile(entry.name)) {
+        node.files.push({ name: entry.name, handle: entry.handle });
+      }
+    }
+    return node;
+  }
+
+  function directoryCounts(node) {
+    return node.children.reduce((totals, child) => {
+      const childTotals = directoryCounts(child);
+      return { directories: totals.directories + childTotals.directories + 1, images: totals.images + childTotals.images };
+    }, { directories: 0, images: node.files.length });
+  }
+
+  async function populateDirectoryBoard(node, boardId, nextState, progress) {
+    const boardColumns = 3;
+    node.children.forEach((child, index) => {
+      child.boardId = crypto.randomUUID();
+      nextState.boards.push({
+        id: child.boardId,
+        title: child.name,
+        icon: "◇",
+        x: 70 + (index % boardColumns) * 290,
+        y: 70 + Math.floor(index / boardColumns) * 190,
+        parentBoardId: boardId,
+        sourcePath: child.relativePath,
+      });
+    });
+
+    const imageStartY = 70 + Math.ceil(node.children.length / boardColumns) * 190;
+    const imageColumns = 2;
+    for (let index = 0; index < node.files.length; index += 1) {
+      const entry = node.files[index];
+      const file = await entry.handle.getFile();
+      const id = crypto.randomUUID();
+      await putImageBlob(id, file);
+      nextState.images.push({
+        id,
+        boardId,
+        x: 70 + (index % imageColumns) * (appSettings.imageCardWidth + 40),
+        y: imageStartY + Math.floor(index / imageColumns) * 520,
+        name: entry.name,
+        caption: "",
+        sourcePath: node.relativePath ? `${node.relativePath}/${entry.name}` : entry.name,
+      });
+      progress.imported += 1;
+      saveStatus.textContent = `Importing image ${progress.imported} of ${progress.total}…`;
+    }
+
+    for (const child of node.children) await populateDirectoryBoard(child, child.boardId, nextState, progress);
+  }
+
+  async function buildProjectFromImageDirectory() {
+    if (!("showDirectoryPicker" in window)) {
+      showTopStatus("Folder import requires Chrome or Edge", 3500);
+      return;
+    }
+    try {
+      showTopStatus("Choose the project image folder…", 0);
+      const rootHandle = await window.showDirectoryPicker({ id: "gn-studio-image-project", mode: "read" });
+      saveStatus.textContent = "Scanning folders…";
+      const tree = await scanImageDirectory(rootHandle);
+      const counts = directoryCounts(tree);
+      const approved = confirm(`Build “${rootHandle.name}” from this folder?\n\n${counts.directories} subfolder${counts.directories === 1 ? "" : "s"} and ${counts.images} image${counts.images === 1 ? "" : "s"} found. This will replace the project currently open in GN Studio.`);
+      if (!approved) {
+        showTopStatus("Folder import cancelled");
+        return;
+      }
+
+      clearTimeout(saveTimer);
+      await clearImageStore();
+      const nextState = {
+        title: rootHandle.name,
+        currentBoardId: "project",
+        directoryProject: true,
+        sourceDirectoryName: rootHandle.name,
+        boards: [],
+        boardViews: {},
+        view: { x: 180, y: 110, zoom: 1 },
+        notes: [],
+        images: [],
+      };
+      state = nextState;
+      await populateDirectoryBoard(tree, "project", nextState, { imported: 0, total: counts.images });
+      await putSetting("source-directory", rootHandle);
+      selectedId = null;
+      gesture = null;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      renderBoardChrome();
+      applyView();
+      renderNotes();
+      scheduleFolderSave();
+      showTopStatus(`Built ${counts.directories} board${counts.directories === 1 ? "" : "s"} with ${counts.images} image${counts.images === 1 ? "" : "s"}`, 3500);
+    } catch (error) {
+      if (error.name === "AbortError") {
+        showTopStatus("Folder selection cancelled");
+      } else {
+        console.error("Image directory import failed", error);
+        showTopStatus("Couldn’t build the project from that folder", 4000);
+      }
+    }
+  }
+
   async function clearCurrentBoard() {
     const boardTitle = currentBoardTitle();
     const referenceCount = state.notes.filter(note => note.boardId === state.currentBoardId).length + state.images.filter(image => image.boardId === state.currentBoardId).length;
@@ -583,6 +701,12 @@
       const img = document.createElement("img");
       img.src = url;
       img.alt = image.caption || image.name || "Board image";
+      img.addEventListener("error", () => {
+        const unavailable = document.createElement("span");
+        unavailable.className = "image-loading";
+        unavailable.textContent = `Preview unavailable: ${image.name || "image"}`;
+        card.querySelector(".image-frame").replaceChildren(unavailable);
+      }, { once: true });
       card.querySelector(".image-frame").replaceChildren(img);
     }).catch(() => { card.querySelector(".image-loading").textContent = "Image unavailable"; });
   }
@@ -812,6 +936,10 @@
   document.querySelector("#storage-folder").addEventListener("click", () => {
     closeTopMenus();
     chooseStorageFolder();
+  });
+  document.querySelector("#import-image-directory").addEventListener("click", () => {
+    closeTopMenus();
+    buildProjectFromImageDirectory();
   });
   document.querySelectorAll("[data-image-size]").forEach(button => {
     button.addEventListener("click", () => {

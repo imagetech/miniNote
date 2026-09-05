@@ -25,6 +25,7 @@ Development for GN Studio takes place on the `gn-studio` branch. MiniNote remain
 - Arbitrarily nested boards created from Add → Board
 - Configurable image-card previews (Small, Medium, or Large) from the Settings menu
 - Global app settings embedded in saved and autosaved project JSON files
+- Build a project from a local image directory, recursively mirroring folders as nested boards
 - Editable board title and responsive layout
 
 ## Run locally
@@ -46,6 +47,8 @@ The workflow in `.github/workflows/pages.yml` publishes the static application o
 ## Local project folder
 
 In supported Chromium browsers, **Projects → Set Storage Folder** selects a directory for automatic disk backups. GN Studio retains the directory handle in IndexedDB and writes a self-contained `<project>.mininote.json` file after changes. The browser may require permission to be renewed after a restart. Firefox and Safari do not currently expose the required directory-access API; manual Save and Load remain available there.
+
+**Projects → Build From Image Folder** creates a new project named after a selected directory. Every subdirectory becomes a nested board, and JPG, JPEG, PNG, GIF, TIF, TIFF, and WebP files are copied into their corresponding boards. Building from a folder replaces the currently open project after confirmation. TIFF items are retained even when the browser cannot generate a native preview.
 
 ## Suggested next milestone
 
