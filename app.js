@@ -148,6 +148,7 @@
     imageUrls.clear();
     notesLayer.replaceChildren();
     boardRail.replaceChildren();
+    if (state.currentBoardId !== "project") renderBackBoardCard();
     for (const board of state.boards.filter(board => board.parentBoardId === state.currentBoardId)) renderBoardCard(board);
     for (const note of state.notes.filter(note => note.boardId === state.currentBoardId)) {
       const card = document.createElement("article");
@@ -210,6 +211,35 @@
       </button>`;
     const body = card.querySelector(".board-card-body");
     body.addEventListener("click", event => { event.stopPropagation(); openBoard(board.id); });
+    boardRail.append(card);
+  }
+
+  function renderBackBoardCard() {
+    const currentBoard = state.boards.find(board => board.id === state.currentBoardId);
+    const parentBoardId = currentBoard?.parentBoardId || "project";
+    const parentTitle = parentBoardId === "project"
+      ? state.title
+      : state.boards.find(board => board.id === parentBoardId)?.title || "Parent board";
+    const card = document.createElement("article");
+    card.className = "board-card back-board-card";
+    card.dataset.id = parentBoardId;
+    card.dataset.board = parentBoardId;
+    card.innerHTML = `
+      <div class="note-handle" aria-hidden="true">
+        <span class="drag-dots">···</span>
+      </div>
+      <button class="board-card-body" type="button" aria-label="Back to ${escapeHtml(parentTitle)}">
+        <span class="board-icon">←</span>
+        <span class="board-card-copy">
+          <strong>Back</strong>
+          <span>${escapeHtml(parentTitle)}</span>
+          <small>Go up one level ↑</small>
+        </span>
+      </button>`;
+    card.querySelector(".board-card-body").addEventListener("click", event => {
+      event.stopPropagation();
+      openBoard(parentBoardId);
+    });
     boardRail.append(card);
   }
 

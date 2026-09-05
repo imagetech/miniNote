@@ -133,6 +133,8 @@ button { color: inherit; }
 .board-card[data-board="settings"] .board-icon { background: #99734d; }
 .board-card[data-board="shots"] .board-icon { background: #486f8f; }
 .board-card[data-board="storyboard"] .board-icon { background: #795c85; }
+.back-board-card .board-icon { color: #4f5c57; background: #e7ebe8; }
+.back-board-card .board-card-copy small { color: #68736f; }
 .board-card-copy { min-width: 0; display: grid; gap: 5px; }
 .board-card-copy strong { overflow: hidden; text-overflow: ellipsis; font-size: 17px; }
 .board-card-copy span { color: #918c83; font-size: 12px; }
