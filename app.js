@@ -16,6 +16,9 @@
   const viewerImage = document.querySelector("#viewer-image");
   const viewerTitle = document.querySelector("#viewer-title");
   const viewerSize = document.querySelector("#viewer-size");
+  const jsonViewer = document.querySelector("#json-viewer");
+  const jsonViewerTitle = document.querySelector("#json-viewer-title");
+  const jsonViewerContent = document.querySelector("#json-viewer-content");
   const boardCreator = document.querySelector("#board-creator");
   const boardCreatorForm = document.querySelector("#board-creator-form");
   const newBoardTitle = document.querySelector("#new-board-title");
@@ -106,7 +109,14 @@
         if (!saved.boards.some(board => board.id === preset.id)) saved.boards.push({ ...preset });
       }
     }
-    saved.notes.forEach(note => { note.boardId ||= "project"; });
+    saved.notes.forEach(note => {
+      note.boardId ||= "project";
+      if (note.sourceType === "json") {
+        note.fileName ||= note.sourcePath?.split(/[\\/]/).pop() || "JSON file";
+        const legacyPrefix = `${note.fileName}\n\n`;
+        if (note.text?.startsWith(legacyPrefix)) note.text = note.text.slice(legacyPrefix.length);
+      }
+    });
     saved.images.forEach(image => { image.boardId ||= "project"; });
     if (!saved.title || saved.title === "My first board") saved.title = "Project";
     if (saved.currentBoardId !== "project" && !saved.boards.some(board => board.id === saved.currentBoardId)) saved.currentBoardId = "project";
@@ -139,13 +149,16 @@
     for (const board of state.boards.filter(board => board.parentBoardId === state.currentBoardId)) renderBoardCard(board);
     for (const note of state.notes.filter(note => note.boardId === state.currentBoardId)) {
       const card = document.createElement("article");
-      card.className = `note${note.id === selectedId ? " selected" : ""}`;
+      const isJsonNote = note.sourceType === "json";
+      const fileName = note.fileName || note.sourcePath?.split(/[\\/]/).pop() || "JSON file";
+      card.className = `note${isJsonNote ? " json-note" : ""}${note.id === selectedId ? " selected" : ""}`;
       card.dataset.id = note.id;
       card.dataset.color = note.color || "paper";
       card.style.transform = `translate(${note.x}px, ${note.y}px)`;
       card.innerHTML = `
-        <div class="note-handle" aria-label="Drag note">
+        <div class="note-handle${isJsonNote ? " has-file-name" : ""}" aria-label="Drag note">
           <span class="drag-dots">···</span>
+          ${isJsonNote ? `<span class="note-file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</span>` : ""}
           <button class="delete-note" type="button" aria-label="Delete note">×</button>
         </div>
         <textarea aria-label="Note text" placeholder="Write something…"></textarea>`;
@@ -162,6 +175,13 @@
       card.querySelector(".note-handle").addEventListener("pointerdown", (event) => startNoteDrag(event, note));
       card.querySelector(".delete-note").addEventListener("pointerdown", event => event.stopPropagation());
       card.querySelector(".delete-note").addEventListener("click", () => deleteNote(note.id));
+      if (isJsonNote) {
+        card.title = "Double-click to view formatted JSON";
+        card.addEventListener("dblclick", event => {
+          event.stopPropagation();
+          openJsonViewer(note);
+        });
+      }
       notesLayer.append(card);
     }
     for (const image of state.images.filter(image => image.boardId === state.currentBoardId)) renderImageCard(image);
@@ -606,7 +626,8 @@
         x: 70 + (index % noteColumns) * 280,
         y: noteStartY + Math.floor(index / noteColumns) * 220,
         color: "paper",
-        text: `${entry.name}\n\n${formattedText}`,
+        text: formattedText,
+        fileName: entry.name,
         sourceType: "json",
         sourcePath: node.relativePath ? `${node.relativePath}/${entry.name}` : entry.name,
       });
@@ -820,6 +841,22 @@
     viewerUrl = null;
   }
 
+  function openJsonViewer(note) {
+    jsonViewerTitle.textContent = note.fileName || note.sourcePath?.split(/[\\/]/).pop() || "JSON file";
+    try {
+      jsonViewerContent.textContent = JSON.stringify(JSON.parse(note.text), null, 2);
+    } catch (_) {
+      jsonViewerContent.textContent = note.text || "";
+    }
+    jsonViewer.showModal();
+    jsonViewerContent.scrollTop = 0;
+  }
+
+  function closeJsonViewer() {
+    jsonViewer.close();
+    jsonViewerContent.textContent = "";
+  }
+
   async function addImageFile(file, clientX, clientY, index = 0) {
     if (!file?.type?.startsWith("image/")) return;
     const id = crypto.randomUUID();
@@ -1002,6 +1039,14 @@
     event.preventDefault();
     closeImageViewer();
   });
+  document.querySelector("#close-json-viewer").addEventListener("click", closeJsonViewer);
+  jsonViewer.addEventListener("click", event => {
+    if (event.target === jsonViewer) closeJsonViewer();
+  });
+  jsonViewer.addEventListener("cancel", event => {
+    event.preventDefault();
+    closeJsonViewer();
+  });
   document.querySelector("#add-image").addEventListener("click", () => {
     closeTopMenus();
     imageInput.click();
@@ -1076,6 +1121,11 @@
     scheduleSave();
   });
   window.addEventListener("keydown", event => {
+    if (event.key === "Escape" && jsonViewer.open) {
+      event.preventDefault();
+      closeJsonViewer();
+      return;
+    }
     if (event.key === "Escape" && imageViewer.open) {
       event.preventDefault();
       closeImageViewer();

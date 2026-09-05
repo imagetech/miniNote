@@ -48,7 +48,7 @@ The workflow in `.github/workflows/pages.yml` publishes the static application o
 
 In supported Chromium browsers, **Projects → Set Storage Folder** selects a directory for automatic disk backups. GN Studio retains the directory handle in IndexedDB and writes a self-contained `<project>.mininote.json` file after changes. The browser may require permission to be renewed after a restart. Firefox and Safari do not currently expose the required directory-access API; manual Save and Load remain available there.
 
-**Projects → Build From Project Folder** creates a new project named after a selected directory. Every subdirectory becomes a nested board; JPG, JPEG, PNG, GIF, TIF, TIFF, and WebP files are copied into their corresponding boards; and JSON files become editable text notes containing the filename and formatted JSON. Building from a folder replaces the currently open project after confirmation. TIFF items are retained even when the browser cannot generate a native preview.
+**Projects → Build From Project Folder** creates a new project named after a selected directory. Every subdirectory becomes a nested board; JPG, JPEG, PNG, GIF, TIF, TIFF, and WebP files are copied into their corresponding boards; and JSON files become editable text notes with the filename in the card header. Double-click a JSON note to open its content in a larger formatted viewer. Building from a folder replaces the currently open project after confirmation. TIFF items are retained even when the browser cannot generate a native preview.
 
 ## Suggested next milestone
 

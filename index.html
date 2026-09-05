@@ -97,6 +97,16 @@
         <img id="viewer-image" alt="Full resolution preview" />
       </div>
     </dialog>
+    <dialog id="json-viewer" class="json-viewer" aria-labelledby="json-viewer-title">
+      <div class="json-viewer-toolbar">
+        <div>
+          <span class="json-badge">JSON</span>
+          <strong id="json-viewer-title">JSON file</strong>
+        </div>
+        <button id="close-json-viewer" type="button" aria-label="Close JSON viewer">×</button>
+      </div>
+      <pre id="json-viewer-content" tabindex="0"></pre>
+    </dialog>
     <dialog id="board-creator" class="board-creator" aria-labelledby="board-creator-title">
       <form id="board-creator-form" method="dialog">
         <div class="creator-icon">◇</div>
