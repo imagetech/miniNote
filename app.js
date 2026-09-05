@@ -726,9 +726,11 @@
     card.dataset.id = image.id;
     card.style.width = `${appSettings.imageCardWidth}px`;
     card.style.transform = `translate(${image.x}px, ${image.y}px)`;
+    const fileName = image.name || "Image";
     card.innerHTML = `
-      <div class="note-handle" aria-label="Drag image">
+      <div class="note-handle has-file-name" aria-label="Drag image">
         <span class="drag-dots">···</span>
+        <span class="note-file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</span>
         <button class="delete-note" type="button" aria-label="Delete image">×</button>
       </div>
       <div class="image-frame"><span class="image-loading">Loading image…</span></div>

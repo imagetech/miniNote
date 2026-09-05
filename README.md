@@ -13,6 +13,7 @@ Development for GN Studio takes place on the `gn-studio` branch. MiniNote remain
 - Drag, edit, select, and delete notes
 - Automatic persistence in browser `localStorage`
 - Image cards from drag-and-drop, clipboard paste, or the image picker
+- Image filenames displayed in the card header
 - Image blobs stored separately in IndexedDB
 - Full-resolution image lightbox on double-click
 - Project workspace with preset Characters, Settings, Shots, and Storyboard boards
